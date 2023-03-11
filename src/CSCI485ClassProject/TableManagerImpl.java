@@ -162,7 +162,7 @@ public class TableManagerImpl implements TableManager{
       return StatusCode.ATTRIBUTE_NOT_FOUND;
     }
     // if exists, remove the attribute corresponding kvPair
-    FDBHelper.removeKeyValuePair(tx, tableAttrDir, pair.getKey());
+    FDBHelper.removeKeyValuePair(tableAttrDir, tx, pair.getKey());
     FDBHelper.commitTransaction(tx);
 
     return StatusCode.SUCCESS;

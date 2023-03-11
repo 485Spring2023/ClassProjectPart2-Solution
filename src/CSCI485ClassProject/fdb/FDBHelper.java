@@ -120,7 +120,7 @@ public class FDBHelper {
     DirectoryLayer.getDefault().remove(tx, path).join();
   }
 
-  public static void removeKeyValuePair(Transaction tx, DirectorySubspace dir, Tuple keyTuple) {
+  public static void removeKeyValuePair(DirectorySubspace dir, Transaction tx, Tuple keyTuple) {
     tx.clear(dir.pack(keyTuple));
   }
 
@@ -135,6 +135,7 @@ public class FDBHelper {
   public static boolean tryCommitTx(Transaction tx, int retryCounter) {
     try {
       tx.commit().join();
+      tx.close();
       return true;
     } catch (FDBException e) {
       if (retryCounter < MAX_TRANSACTION_COMMIT_RETRY_TIMES) {
@@ -150,5 +151,6 @@ public class FDBHelper {
 
   public static void abortTransaction(Transaction tx) {
     tx.cancel();
+    tx.close();
   }
 }

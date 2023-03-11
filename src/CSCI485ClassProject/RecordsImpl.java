@@ -36,14 +36,17 @@ public class RecordsImpl implements Records{
 
     Transaction tx = FDBHelper.openTransaction(db);
     if (!FDBHelper.doesSubdirectoryExists(tx, Collections.singletonList(tableName))) {
+      FDBHelper.abortTransaction(tx);
       return StatusCode.TABLE_NOT_FOUND;
     }
 
     if (primaryKeys == null || primaryKeysValues == null || attrNames == null || attrValues == null) {
+      FDBHelper.abortTransaction(tx);
       return StatusCode.DATA_RECORD_CREATION_ATTRIBUTES_INVALID;
     }
 
     if (primaryKeys.length != primaryKeysValues.length || attrValues.length != attrNames.length) {
+      FDBHelper.abortTransaction(tx);
       return StatusCode.DATA_RECORD_CREATION_ATTRIBUTES_INVALID;
     }
 
@@ -54,6 +57,7 @@ public class RecordsImpl implements Records{
 
     // check if pks is identical to schemaPks
     if (!pks.containsAll(schemaPks) || !schemaPks.containsAll(pks)) {
+      FDBHelper.abortTransaction(tx);
       return StatusCode.DATA_RECORD_PRIMARY_KEYS_UNMATCHED;
     }
 
@@ -62,6 +66,7 @@ public class RecordsImpl implements Records{
     for (int i = 0; i<primaryKeys.length; i++) {
       StatusCode status = record.setAttrNameAndValue(primaryKeys[i], primaryKeysValues[i]);
       if (status != StatusCode.SUCCESS) {
+        FDBHelper.abortTransaction(tx);
         return status;
       }
     }
@@ -75,6 +80,7 @@ public class RecordsImpl implements Records{
       String attrName = attrNames[i];
       StatusCode status = record.setAttrNameAndValue(attrName, attrValues[i]);
       if (status != StatusCode.SUCCESS) {
+        FDBHelper.abortTransaction(tx);
         return status;
       }
 
@@ -82,6 +88,7 @@ public class RecordsImpl implements Records{
       if (!existingTblAttributeNames.contains(attrName)) {
         tblSchemaUpdatePairs.add(tblMetadataTransformer.getAttributeKVPair(attrName, attrType));
       } else if (!attrType.equals(tblMetadata.getAttributeType(attrName))) {
+        FDBHelper.abortTransaction(tx);
         return StatusCode.DATA_RECORD_CREATION_ATTRIBUTE_TYPE_UNMATCHED;
       }
     }
@@ -108,6 +115,21 @@ public class RecordsImpl implements Records{
   }
 
   @Override
+  public Cursor openCursor(String tableName, Cursor.Mode mode) {
+    Transaction tx = FDBHelper.openTransaction(db);
+
+    if (!FDBHelper.doesSubdirectoryExists(tx, Collections.singletonList(tableName))) {
+      // check if the table exists
+      FDBHelper.abortTransaction(tx);
+      return null;
+    }
+
+    TableMetadata tblMetadata = getTableMetadataByTableName(tx, tableName);
+    Cursor cursor = new Cursor(mode, tableName, tblMetadata, tx);
+    return cursor;
+  }
+
+  @Override
   public Cursor openCursor(String tableName, String attrName, Object attrValue, ComparisonOperator operator, Cursor.Mode mode, boolean isUsingIndex) {
     Transaction tx = FDBHelper.openTransaction(db);
 
@@ -125,70 +147,59 @@ public class RecordsImpl implements Records{
       return null;
     }
 
-    Cursor cursor = new Cursor(mode, tableName, tblMetadata);
-    cursor.setTx(tx);
+    Cursor cursor = new Cursor(mode, tableName, tblMetadata, tx);
     cursor.enablePredicate(attrName, attrValue, operator);
     return cursor;
   }
 
   @Override
-  public Cursor openCursor(String tableName, Cursor.Mode mode) {
-    return null;
-  }
-
-  @Override
   public Record getFirst(Cursor cursor) {
-    return cursor.getFirst(cursor.getTx());
+    return cursor.getFirst();
   }
 
   @Override
   public Record getLast(Cursor cursor) {
-    return null;
+    return cursor.getLast();
   }
 
   @Override
   public Record getNext(Cursor cursor) {
-    return cursor.next(cursor.getTx());
+    return cursor.next(false);
   }
 
   @Override
   public Record getPrevious(Cursor cursor) {
-    // TODO: discuss how to design this
-    return null;
+    return cursor.next(true);
   }
 
   @Override
   public StatusCode updateRecord(Cursor cursor, String[] attrNames, Object[] attrValues) {
-    return StatusCode.SUCCESS;
+    return cursor.updateCurrentRecord(attrNames, attrValues);
   }
 
   @Override
   public StatusCode deleteRecord(Cursor cursor) {
-    return StatusCode.SUCCESS;
-  }
-
-  @Override
-  public StatusCode commitCursor(Cursor cursor) {
-    if (cursor == null) {
-      return StatusCode.CURSOR_CANNOT_BE_NULL;
-    }
-
-    cursor.commit();
-    return StatusCode.SUCCESS;
-  }
-
-  @Override
-  public StatusCode abortCursor(Cursor cursor) {
-    if (cursor == null) {
-      return StatusCode.SUCCESS;
-    }
-
-    cursor.abort();
-    return StatusCode.SUCCESS;
+    return cursor.deleteCurrentRecord();
   }
 
   @Override
   public StatusCode deleteDataRecord(String tableName, String[] attrNames, Object[] attrValues) {
     return null;
+  }
+
+  @Override
+  public StatusCode commitCursor(Cursor cursor) {
+    if (cursor != null) {
+      cursor.commit();
+    }
+    return StatusCode.SUCCESS;
+  }
+
+  @Override
+  public StatusCode abortCursor(Cursor cursor) {
+    if (cursor != null) {
+      cursor.abort();
+    }
+    return StatusCode.SUCCESS;
   }
 }
