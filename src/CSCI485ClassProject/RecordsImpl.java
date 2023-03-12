@@ -13,6 +13,7 @@ import com.apple.foundationdb.directory.DirectorySubspace;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -72,7 +73,9 @@ public class RecordsImpl implements Records{
     }
 
     // update the table schema if there are new columns
-    Set<String> existingTblAttributeNames = tblMetadata.getAttributes().keySet();
+    HashMap<String, AttributeType> existingTblAttributes = tblMetadata.getAttributes();
+    Set<String> existingTblAttributeNames = existingTblAttributes.keySet();
+
     List<FDBKVPair> tblSchemaUpdatePairs = new ArrayList<>();
     TableMetadataTransformer tblMetadataTransformer = new TableMetadataTransformer(tableName);
 
@@ -87,7 +90,7 @@ public class RecordsImpl implements Records{
       AttributeType attrType = record.getTypeForGivenAttrName(attrName);
       if (!existingTblAttributeNames.contains(attrName)) {
         tblSchemaUpdatePairs.add(tblMetadataTransformer.getAttributeKVPair(attrName, attrType));
-      } else if (!attrType.equals(tblMetadata.getAttributeType(attrName))) {
+      } else if (!attrType.equals(existingTblAttributes.get(attrName))) {
         FDBHelper.abortTransaction(tx);
         return StatusCode.DATA_RECORD_CREATION_ATTRIBUTE_TYPE_UNMATCHED;
       }
