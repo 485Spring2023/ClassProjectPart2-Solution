@@ -2,9 +2,11 @@ package CSCI485ClassProject;
 
 import CSCI485ClassProject.fdb.FDBHelper;
 import CSCI485ClassProject.fdb.FDBKVPair;
+import CSCI485ClassProject.models.AttributeType;
 import CSCI485ClassProject.models.ComparisonOperator;
 import CSCI485ClassProject.models.Record;
 import CSCI485ClassProject.models.TableMetadata;
+import CSCI485ClassProject.test.CursorUtils;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.async.AsyncIterable;
@@ -13,9 +15,7 @@ import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import static CSCI485ClassProject.RecordsTransformer.getPrimaryKeyValTuple;
@@ -27,9 +27,9 @@ public class Cursor {
   }
 
   private boolean isPredicateEnabled = false;
-  private String attributeName;
-  private Object attributeValue;
-  private ComparisonOperator operator;
+  private String predicateAttributeName;
+  private Record.Value predicateAttributeValue;
+  private ComparisonOperator predicateOperator;
 
   private String tableName;
   private TableMetadata tableMetadata;
@@ -104,13 +104,15 @@ public class Cursor {
     this.tableMetadata = tableMetadata;
   }
 
-  public StatusCode enablePredicate(String attrName, Object value, ComparisonOperator operator) {
-    this.attributeName = attrName;
-    this.attributeValue = value;
-    this.operator = operator;
+  public StatusCode enablePredicate(String attrName, Record.Value value, ComparisonOperator operator) {
+    this.predicateAttributeName = attrName;
+    this.predicateAttributeValue = value;
+    this.predicateOperator = operator;
     this.isPredicateEnabled = true;
     return null;
   }
+
+
 
   private Record seek(Transaction tx, boolean isInitializing) {
     // if it is not initialized, return null;
@@ -206,7 +208,33 @@ public class Cursor {
       return null;
     }
     isInitializedToLast = false;
-    return seek(tx, true);
+
+    Record record = seek(tx, true);
+    if (isPredicateEnabled) {
+      while (record != null && !doesRecordMatchPredicate(record)) {
+        record = seek(tx, false);
+      }
+    }
+    return record;
+  }
+
+  private boolean doesRecordMatchPredicate(Record record) {
+    Object recVal = record.getValueForGivenAttrName(predicateAttributeName);
+    AttributeType recType = record.getTypeForGivenAttrName(predicateAttributeName);
+    if (recVal == null || recType == null) {
+      // attribute not exists in this record
+      return false;
+    }
+
+    if (recType == AttributeType.INT) {
+      return CursorUtils.compareTwoINT(recVal, predicateAttributeValue.getValue(), predicateOperator);
+    } else if (recType == AttributeType.DOUBLE){
+      return CursorUtils.compareTwoDOUBLE(recVal, predicateAttributeValue.getValue(), predicateOperator);
+    } else if (recType == AttributeType.VARCHAR) {
+      return CursorUtils.compareTwoVARCHAR(recVal, predicateAttributeValue.getValue(), predicateOperator);
+    }
+
+    return false;
   }
 
   public Record getLast() {
@@ -214,7 +242,14 @@ public class Cursor {
       return null;
     }
     isInitializedToLast = true;
-    return seek(tx, true);
+
+    Record record = seek(tx, true);
+    if (isPredicateEnabled) {
+      while (record != null && !doesRecordMatchPredicate(record)) {
+        record = seek(tx, false);
+      }
+    }
+    return record;
   }
 
   public boolean hasNext() {
@@ -228,7 +263,14 @@ public class Cursor {
     if (isGetPrevious != isInitializedToLast) {
       return null;
     }
-    return seek(tx, false);
+
+    Record record = seek(tx, false);
+    if (isPredicateEnabled) {
+      while (record != null && !doesRecordMatchPredicate(record)) {
+        record = seek(tx, false);
+      }
+    }
+    return record;
   }
 
   public StatusCode updateCurrentRecord(String[] attrNames, Object[] attrValues) {

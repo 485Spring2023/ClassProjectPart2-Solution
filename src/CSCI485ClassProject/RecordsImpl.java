@@ -148,7 +148,13 @@ public class RecordsImpl implements Records{
     }
 
     Cursor cursor = new Cursor(mode, tableName, tblMetadata, tx);
-    cursor.enablePredicate(attrName, attrValue, operator);
+    Record.Value attrVal = new Record.Value();
+    StatusCode initVal = attrVal.setValue(attrValue);
+    if (initVal != StatusCode.SUCCESS) {
+      FDBHelper.abortTransaction(tx);
+      return null;
+    }
+    cursor.enablePredicate(attrName, attrVal, operator);
     return cursor;
   }
 
