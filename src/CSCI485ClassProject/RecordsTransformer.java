@@ -33,6 +33,19 @@ public class RecordsTransformer {
     return tableRecordPath;
   }
 
+  public boolean doesPrimaryKeyExist(Transaction tx, Tuple primaryKeyTuple) {
+    if (!FDBHelper.doesSubdirectoryExists(tx, tableRecordPath)) {
+      return false;
+    }
+
+    DirectorySubspace dir = FDBHelper.openSubspace(tx, tableRecordPath);
+
+    if (DBConf.IS_ROW_STORAGE) {
+      return FDBHelper.getKVPairIterableWithPrefixInDirectory(dir, tx, primaryKeyTuple, false).iterator().hasNext();
+    }
+    return false;
+  }
+
   public static String getAttributeNameFromTuples(Tuple keyTuple, Tuple valueTuple) {
     if (DBConf.IS_ROW_STORAGE) {
       return keyTuple.getString(keyTuple.size() - 1);

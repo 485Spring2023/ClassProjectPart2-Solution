@@ -4,6 +4,7 @@ import CSCI485ClassProject.models.ComparisonOperator;
 import com.apple.foundationdb.Database;
 import com.apple.foundationdb.FDB;
 import com.apple.foundationdb.FDBException;
+import com.apple.foundationdb.KeySelector;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.Range;
 import com.apple.foundationdb.ReadTransaction;
@@ -52,6 +53,27 @@ public class FDBHelper {
     return tx.getRange(Range.startsWith(dir.pack(prefixTuple)), ReadTransaction.ROW_LIMIT_UNLIMITED, isReverse);
   }
 
+  public static AsyncIterable<KeyValue> getKVPairIterableStartWithPrefixInDirectory(DirectorySubspace dir, Transaction tx, Tuple prefixTuple, boolean isReverse) {
+    if (dir == null) {
+      return null;
+    }
+
+    if (!isReverse) {
+      KeySelector beginKeySelector = KeySelector.firstGreaterOrEqual(dir.pack(prefixTuple));
+
+      Range dirRange = dir.range();
+      Range range = new Range(beginKeySelector.getKey(), dirRange.end);
+
+      return tx.getRange(range, ReadTransaction.ROW_LIMIT_UNLIMITED, false);
+    } else {
+      KeySelector endKeySelector = KeySelector.lastLessOrEqual(dir.pack(prefixTuple));
+
+      Range dirRange = dir.range();
+      Range range = new Range(dirRange.begin, endKeySelector.getKey());
+
+      return tx.getRange(range, ReadTransaction.ROW_LIMIT_UNLIMITED, true);
+    }
+  }
 
   public static void setFDBKVPair(DirectorySubspace tgtSubspace, Transaction tx, FDBKVPair kv) {
     if (tgtSubspace == null) {

@@ -143,17 +143,17 @@ public class Cursor {
     if (DBConf.IS_ROW_STORAGE) {
       boolean isSavePK = false;
       Tuple pkValTuple = new Tuple();
+      Tuple tempPkValTuple = null;
       while (iterator.hasNext()) {
         KeyValue kv = iterator.next();
         Tuple keyTuple = directorySubspace.unpack(kv.getKey());
         Tuple valTuple = Tuple.fromBytes(kv.getValue());
-        Tuple tempPkValTuple = getPrimaryKeyValTuple(keyTuple);
+        tempPkValTuple = getPrimaryKeyValTuple(keyTuple);
         if (!isSavePK) {
           pkValTuple = tempPkValTuple;
           isSavePK = true;
         } else if (!pkValTuple.equals(tempPkValTuple)){
           // when pkVal change, stop there
-          pkValTuple = tempPkValTuple;
           break;
         }
         fdbkvPairs.add(new FDBKVPair(recordStorePath, keyTuple, valTuple));
@@ -164,7 +164,11 @@ public class Cursor {
 
       if (iterator.hasNext()) {
         // reset the iterator
-        iterator = FDBHelper.getKVPairIterableWithPrefixInDirectory(directorySubspace, tx, pkValTuple, isInitializedToLast).iterator();
+        if (isInitializedToLast) {
+          iterator = FDBHelper.getKVPairIterableStartWithPrefixInDirectory(directorySubspace, tx, pkValTuple, isInitializedToLast).iterator();
+        } else {
+          iterator = FDBHelper.getKVPairIterableStartWithPrefixInDirectory(directorySubspace, tx, tempPkValTuple, isInitializedToLast).iterator();
+        }
       }
 
     } else {
@@ -211,8 +215,11 @@ public class Cursor {
 
     Record record = seek(tx, true);
     if (isPredicateEnabled) {
-      while (record != null && !doesRecordMatchPredicate(record)) {
+      while (!doesRecordMatchPredicate(record)) {
         record = seek(tx, false);
+        if (record == null) {
+          break;
+        }
       }
     }
     return record;
@@ -280,6 +287,12 @@ public class Cursor {
 
     if (currentRecord == null) {
       return StatusCode.CURSOR_REACH_TO_EOF;
+    }
+
+    // delete the current record first
+    StatusCode deleteStatus = deleteCurrentRecord();
+    if (deleteStatus != StatusCode.SUCCESS) {
+      return deleteStatus;
     }
 
     // update the current record with new val

@@ -5,5 +5,5 @@ public class DBConf {
   public static String TABLE_SCHEMA_STORE = "schema";
   public static String TABLE_RECORDS_STORE = "records";
 
-  public static boolean IS_ROW_STORAGE = false;
+  public static boolean IS_ROW_STORAGE = true;
 }

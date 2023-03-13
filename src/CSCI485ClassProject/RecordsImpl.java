@@ -9,6 +9,7 @@ import CSCI485ClassProject.models.TableMetadata;
 import com.apple.foundationdb.Database;
 import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.DirectorySubspace;
+import com.apple.foundationdb.tuple.Tuple;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -96,10 +97,20 @@ public class RecordsImpl implements Records{
       }
     }
 
-
     // serialize the Record and persist to FDB
     // persist the data pairs
     RecordsTransformer recordsTransformer = new RecordsTransformer(tableName, tblMetadata);
+
+    // check if records already exists
+    Tuple primKeyTuple = new Tuple();
+    for (int i = 0; i<primaryKeysValues.length; i++) {
+      primKeyTuple = primKeyTuple.addObject(primaryKeysValues[i]);
+    }
+
+    if (recordsTransformer.doesPrimaryKeyExist(tx, primKeyTuple)) {
+      return StatusCode.DATA_RECORD_CREATION_RECORD_ALREADY_EXISTS;
+    }
+
     List<FDBKVPair> fdbkvPairs = recordsTransformer.convertToFDBKVPairs(record);
 
     DirectorySubspace dataRecordsSubspace = FDBHelper.createOrOpenSubspace(tx, recordsTransformer.getTableRecordPath());

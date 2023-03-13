@@ -4,8 +4,19 @@ import CSCI485ClassProject.models.ComparisonOperator;
 
 public class CursorUtils {
   public static boolean compareTwoINT(Object obj1, Object obj2, ComparisonOperator cmp) {
-    long val1 = (long) obj1;
-    long val2 = (long) obj2;
+    long val1;
+    if (obj1 instanceof Integer) {
+      val1 = new Long((Integer) obj1);
+    } else {
+      val1 = (long) obj1;
+    }
+
+    long val2;
+    if (obj2 instanceof Integer) {
+      val2 = new Long((Integer) obj2);
+    } else {
+      val2 = (long) obj2;
+    }
 
     if (cmp == ComparisonOperator.GREATER_THAN_OR_EQUAL_TO) {
       // >=

@@ -68,7 +68,15 @@ public class Record {
      * @return StatusCode
      */
     public StatusCode setValue(Object value) {
+<<<<<<< HEAD
       if (!isTypeSupported(value))
+=======
+      if ( value != null                  // NULL
+          && !(value instanceof Integer)  // INT
+          && !(value instanceof Long)     // INT (long also regards as INT)
+          && !(value instanceof String) // VARCHAR
+          && !(value instanceof Double)) // DOUBLE
+>>>>>>> pass all the tests
         return ATTRIBUTE_TYPE_NOT_SUPPORTED;
 
       this.value = value;
