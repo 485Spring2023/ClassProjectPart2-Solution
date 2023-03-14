@@ -1,4 +1,4 @@
-package CSCI485ClassProject.test;
+package CSCI485ClassProject;
 
 import CSCI485ClassProject.models.ComparisonOperator;
 
@@ -22,7 +22,7 @@ public class CursorUtils {
       // >=
       return val1 >= val2;
 
-    } else if (cmp == ComparisonOperator.GREATER_THEN) {
+    } else if (cmp == ComparisonOperator.GREATER_THAN) {
       // >
       return val1 > val2;
     } else if (cmp == ComparisonOperator.EQUAL_TO) {
@@ -45,7 +45,7 @@ public class CursorUtils {
       // >=
       return val1 >= val2;
 
-    } else if (cmp == ComparisonOperator.GREATER_THEN) {
+    } else if (cmp == ComparisonOperator.GREATER_THAN) {
       // >
       return val1 > val2;
     } else if (cmp == ComparisonOperator.EQUAL_TO) {
@@ -68,7 +68,7 @@ public class CursorUtils {
       // >=
       return val1.equals(val2) || val1.compareTo(val2) > 0;
 
-    } else if (cmp == ComparisonOperator.GREATER_THEN) {
+    } else if (cmp == ComparisonOperator.GREATER_THAN) {
       // >
       return val1.compareTo(val2) > 0;
     } else if (cmp == ComparisonOperator.EQUAL_TO) {

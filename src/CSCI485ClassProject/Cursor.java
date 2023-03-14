@@ -6,7 +6,6 @@ import CSCI485ClassProject.models.AttributeType;
 import CSCI485ClassProject.models.ComparisonOperator;
 import CSCI485ClassProject.models.Record;
 import CSCI485ClassProject.models.TableMetadata;
-import CSCI485ClassProject.test.CursorUtils;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.async.AsyncIterable;
@@ -38,7 +37,7 @@ public class Cursor {
   private boolean isInitialized = false;
   private boolean isInitializedToLast = false;
 
-  private Mode mode;
+  private final Mode mode;
 
   private AsyncIterator<KeyValue> iterator = null;
 
@@ -46,7 +45,7 @@ public class Cursor {
   // used by the col storage
   private String currentAttributeName;
 
-  private final Transaction tx;
+  private Transaction tx;
 
   private DirectorySubspace directorySubspace;
 
@@ -69,6 +68,8 @@ public class Cursor {
     if (tx != null) {
       FDBHelper.abortTransaction(tx);
     }
+
+    tx = null;
   }
 
   public void commit() {
@@ -78,6 +79,8 @@ public class Cursor {
     if (tx != null) {
       FDBHelper.commitTransaction(tx);
     }
+
+    tx = null;
   }
 
   public final Mode getMode() {
@@ -281,6 +284,10 @@ public class Cursor {
   }
 
   public StatusCode updateCurrentRecord(String[] attrNames, Object[] attrValues) {
+    if (tx == null) {
+      return StatusCode.CURSOR_INVALID;
+    }
+
     if (!isInitialized) {
       return StatusCode.CURSOR_NOT_INITIALIZED;
     }
@@ -289,25 +296,30 @@ public class Cursor {
       return StatusCode.CURSOR_REACH_TO_EOF;
     }
 
+    Set<String> currentAttrNames = currentRecord.getMapAttrNameToValue().keySet();
+    for (int i = 0; i<attrNames.length; i++) {
+      String attrNameToUpdate = attrNames[i];
+      Object attrValToUpdate = attrValues[i];
+
+      if (!currentAttrNames.contains(attrNameToUpdate)) {
+        return StatusCode.CURSOR_UPDATE_ATTRIBUTE_NOT_FOUND;
+      }
+
+      if (!Record.Value.isTypeSupported(attrValToUpdate)) {
+        return StatusCode.ATTRIBUTE_TYPE_NOT_SUPPORTED;
+      }
+    }
+
     // delete the current record first
     StatusCode deleteStatus = deleteCurrentRecord();
     if (deleteStatus != StatusCode.SUCCESS) {
       return deleteStatus;
     }
 
-    // update the current record with new val
-    Set<String> currentAttrNames = currentRecord.getMapAttrNameToValue().keySet();
-
     for (int i = 0; i<attrNames.length; i++) {
       String attrNameToUpdate = attrNames[i];
       Object attrValToUpdate = attrValues[i];
-      if (!currentAttrNames.contains(attrNameToUpdate)) {
-        return StatusCode.CURSOR_UPDATE_ATTRIBUTE_NOT_FOUND;
-      }
-      StatusCode setAttrStatus = currentRecord.setAttrNameAndValue(attrNameToUpdate, attrValToUpdate);
-      if (setAttrStatus != StatusCode.SUCCESS) {
-        return setAttrStatus;
-      }
+      currentRecord.setAttrNameAndValue(attrNameToUpdate, attrValToUpdate);
     }
 
     List<FDBKVPair> kvPairsToUpdate = recordsTransformer.convertToFDBKVPairs(currentRecord);
@@ -318,6 +330,10 @@ public class Cursor {
   }
 
   public StatusCode deleteCurrentRecord() {
+    if (tx == null) {
+      return StatusCode.CURSOR_INVALID;
+    }
+
     if (!isInitialized) {
       return StatusCode.CURSOR_NOT_INITIALIZED;
     }
