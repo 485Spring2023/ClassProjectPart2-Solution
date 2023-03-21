@@ -167,6 +167,7 @@ public class Part2Test {
       ssn--;
     }
 
+    assertEquals(StatusCode.SUCCESS, records.commitCursor(cursor));
     assertEquals(-1, ssn);
     System.out.println("Test2 passed!");
   }
@@ -241,6 +242,7 @@ public class Part2Test {
       assertEquals(address, record.getValueForGivenAttrName(Address));
     }
     assertNull(records.getNext(cursor));
+    assertEquals(StatusCode.SUCCESS, records.commitCursor(cursor));
     System.out.println("Test4 passed!");
   }
 
@@ -275,8 +277,8 @@ public class Part2Test {
         assertEquals(salary, record.getValueForGivenAttrName(Salary));
       }
       assertNull(records.getNext(cursor));
+      assertEquals(StatusCode.SUCCESS, records.commitCursor(cursor));
     }
-
     System.out.println("Test5 passed!");
   }
 
@@ -336,6 +338,7 @@ public class Part2Test {
         // odd records should have gone
         assertNull(rec);
       }
+      assertEquals(StatusCode.SUCCESS, records.commitCursor(cursor));
     }
 
     System.out.println("Test6 passed!");
@@ -450,6 +453,8 @@ public class Part2Test {
         // even records should have gone
         assertNull(rec);
       }
+
+      assertEquals(StatusCode.SUCCESS, records.commitCursor(cursor));
     }
     System.out.println("Test7 passed!");
   }
