@@ -40,42 +40,22 @@ public class RecordsTransformer {
 
     DirectorySubspace dir = FDBHelper.openSubspace(tx, tableRecordPath);
 
-    if (DBConf.IS_ROW_STORAGE) {
-      return FDBHelper.getKVPairIterableWithPrefixInDirectory(dir, tx, primaryKeyTuple, false).iterator().hasNext();
-    }
-    return false;
+    return FDBHelper.getKVPairIterableWithPrefixInDirectory(dir, tx, primaryKeyTuple, false).iterator().hasNext();
   }
 
   public static String getAttributeNameFromTuples(Tuple keyTuple, Tuple valueTuple) {
-    if (DBConf.IS_ROW_STORAGE) {
-      return keyTuple.getString(keyTuple.size() - 1);
-    } else {
-      return keyTuple.getString(0);
-    }
+    return keyTuple.getString(keyTuple.size() - 1);
   }
 
   public static Object getAttributeValFromTuples(Tuple keyTuple, Tuple valueTuple) {
-    if (DBConf.IS_ROW_STORAGE) {
-      return valueTuple.get(0);
-    } else {
-      return valueTuple.get(0);
-    }
+    return valueTuple.get(0);
   }
 
   public static Tuple getPrimaryKeyValTuple(Tuple keyTuple) {
     Tuple primTuple = new Tuple();
-    if (DBConf.IS_ROW_STORAGE) {
-      for (int i = 0; i<keyTuple.size()-1; i++) {
-        Object o = keyTuple.get(i);
-        primTuple = primTuple.addObject(o);
-      }
-    } else {
-      // Column Storage
-      int i;
-      for (i = 1; i<keyTuple.size(); i++) {
-        Object o = keyTuple.get(i);
-        primTuple = primTuple.addObject(keyTuple.get(i));
-      }
+    for (int i = 0; i<keyTuple.size()-1; i++) {
+      Object o = keyTuple.get(i);
+      primTuple = primTuple.addObject(o);
     }
     return primTuple;
   }
@@ -83,22 +63,11 @@ public class RecordsTransformer {
 
   public static Tuple getRecordKeyTuple(List<Object> primaryKeyValues, String attributeName, Object value) {
     Tuple keyTuple = new Tuple();
-
-    if (DBConf.IS_ROW_STORAGE) {
-      for (Object primVal : primaryKeyValues) {
-        keyTuple = keyTuple.addObject(primVal);
-      }
-
-      keyTuple = keyTuple.add(attributeName);
-
-    } else {
-      keyTuple = keyTuple.add(attributeName);
-
-      for (Object primVal : primaryKeyValues) {
-        keyTuple = keyTuple.addObject(primVal);
-      }
+    for (Object primVal : primaryKeyValues) {
+      keyTuple = keyTuple.addObject(primVal);
     }
 
+    keyTuple = keyTuple.add(attributeName);
     return keyTuple;
   }
 

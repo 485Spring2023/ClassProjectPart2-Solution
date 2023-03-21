@@ -146,78 +146,43 @@ public class Cursor {
 
     List<String> recordStorePath = recordsTransformer.getTableRecordPath();
     List<FDBKVPair> fdbkvPairs = new ArrayList<>();
-    if (DBConf.IS_ROW_STORAGE) {
 
-      boolean isSavePK = false;
-      Tuple pkValTuple = new Tuple();
-      Tuple tempPkValTuple = null;
-      if (isMoved && currentKVPair != null) {
-        fdbkvPairs.add(currentKVPair);
-        pkValTuple = getPrimaryKeyValTuple(currentKVPair.getKey());
-        isSavePK = true;
-      }
+    boolean isSavePK = false;
+    Tuple pkValTuple = new Tuple();
+    Tuple tempPkValTuple = null;
+    if (isMoved && currentKVPair != null) {
+      fdbkvPairs.add(currentKVPair);
+      pkValTuple = getPrimaryKeyValTuple(currentKVPair.getKey());
+      isSavePK = true;
+    }
 
-      isMoved = true;
-      boolean nextExists = false;
+    isMoved = true;
+    boolean nextExists = false;
 
-      while (iterator.hasNext()) {
-        KeyValue kv = iterator.next();
-        Tuple keyTuple = directorySubspace.unpack(kv.getKey());
-        Tuple valTuple = Tuple.fromBytes(kv.getValue());
-        FDBKVPair kvPair = new FDBKVPair(recordStorePath, keyTuple, valTuple);
-        tempPkValTuple = getPrimaryKeyValTuple(keyTuple);
-        if (!isSavePK) {
-          pkValTuple = tempPkValTuple;
-          isSavePK = true;
-        } else if (!pkValTuple.equals(tempPkValTuple)){
-          // when pkVal change, stop there
-          currentKVPair = kvPair;
-          nextExists = true;
-          break;
-        }
-        fdbkvPairs.add(kvPair);
-      }
-      if (!fdbkvPairs.isEmpty()) {
-        currentRecord = recordsTransformer.convertBackToRecord(fdbkvPairs);
-      }
-
-      if (!nextExists) {
-        currentKVPair = null;
-      }
-
-    } else {
-      // Column Storage
-      // get the attribute name from the current key-value entry
+    while (iterator.hasNext()) {
       KeyValue kv = iterator.next();
       Tuple keyTuple = directorySubspace.unpack(kv.getKey());
       Tuple valTuple = Tuple.fromBytes(kv.getValue());
-      String attrName = RecordsTransformer.getAttributeNameFromTuples(keyTuple, valTuple);
-      if (isInitializing) {
-        currentAttributeName = attrName;
+      FDBKVPair kvPair = new FDBKVPair(recordStorePath, keyTuple, valTuple);
+      tempPkValTuple = getPrimaryKeyValTuple(keyTuple);
+      if (!isSavePK) {
+        pkValTuple = tempPkValTuple;
+        isSavePK = true;
+      } else if (!pkValTuple.equals(tempPkValTuple)){
+        // when pkVal change, stop there
+        currentKVPair = kvPair;
+        nextExists = true;
+        break;
       }
-      if (currentAttributeName.equals(attrName)) {
-        // scan the whole directory space for the records
-        AsyncIterator<KeyValue> ite = FDBHelper.getKVPairIterableOfDirectory(directorySubspace, tx, isInitializedToLast).iterator();
-        Tuple primaryVal = getPrimaryKeyValTuple(keyTuple);
-
-        while (ite.hasNext()) {
-          kv = ite.next();
-          keyTuple = directorySubspace.unpack(kv.getKey());
-          valTuple = Tuple.from(kv.getValue());
-
-          List<Object> primVals = getPrimaryKeyValTuple(keyTuple).getItems();
-          if (primVals.equals(primaryVal)) {
-            fdbkvPairs.add(new FDBKVPair(recordStorePath, keyTuple, valTuple));
-          }
-        }
-      }
-
-      if (!fdbkvPairs.isEmpty()) {
-        currentRecord = recordsTransformer.convertBackToRecord(fdbkvPairs);
-      }
+      fdbkvPairs.add(kvPair);
+    }
+    if (!fdbkvPairs.isEmpty()) {
+      currentRecord = recordsTransformer.convertBackToRecord(fdbkvPairs);
     }
 
-
+    if (!nextExists) {
+      currentKVPair = null;
+    }
     return currentRecord;
   }
 
