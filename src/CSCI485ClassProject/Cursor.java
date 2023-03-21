@@ -49,6 +49,9 @@ public class Cursor {
 
   private DirectorySubspace directorySubspace;
 
+  private boolean isMoved = false;
+  private FDBKVPair currentKVPair = null;
+
   public Cursor(Mode mode, String tableName, TableMetadata tableMetadata, Transaction tx) {
     this.mode = mode;
     this.tableName = tableName;
@@ -144,34 +147,42 @@ public class Cursor {
     List<String> recordStorePath = recordsTransformer.getTableRecordPath();
     List<FDBKVPair> fdbkvPairs = new ArrayList<>();
     if (DBConf.IS_ROW_STORAGE) {
+
       boolean isSavePK = false;
       Tuple pkValTuple = new Tuple();
       Tuple tempPkValTuple = null;
+      if (isMoved && currentKVPair != null) {
+        fdbkvPairs.add(currentKVPair);
+        pkValTuple = getPrimaryKeyValTuple(currentKVPair.getKey());
+        isSavePK = true;
+      }
+
+      isMoved = true;
+      boolean nextExists = false;
+
       while (iterator.hasNext()) {
         KeyValue kv = iterator.next();
         Tuple keyTuple = directorySubspace.unpack(kv.getKey());
         Tuple valTuple = Tuple.fromBytes(kv.getValue());
+        FDBKVPair kvPair = new FDBKVPair(recordStorePath, keyTuple, valTuple);
         tempPkValTuple = getPrimaryKeyValTuple(keyTuple);
         if (!isSavePK) {
           pkValTuple = tempPkValTuple;
           isSavePK = true;
         } else if (!pkValTuple.equals(tempPkValTuple)){
           // when pkVal change, stop there
+          currentKVPair = kvPair;
+          nextExists = true;
           break;
         }
-        fdbkvPairs.add(new FDBKVPair(recordStorePath, keyTuple, valTuple));
+        fdbkvPairs.add(kvPair);
       }
       if (!fdbkvPairs.isEmpty()) {
         currentRecord = recordsTransformer.convertBackToRecord(fdbkvPairs);
       }
 
-      if (iterator.hasNext()) {
-        // reset the iterator
-        if (isInitializedToLast) {
-          iterator = FDBHelper.getKVPairIterableStartWithPrefixInDirectory(directorySubspace, tx, pkValTuple, isInitializedToLast).iterator();
-        } else {
-          iterator = FDBHelper.getKVPairIterableStartWithPrefixInDirectory(directorySubspace, tx, tempPkValTuple, isInitializedToLast).iterator();
-        }
+      if (!nextExists) {
+        currentKVPair = null;
       }
 
     } else {
@@ -263,7 +274,7 @@ public class Cursor {
   }
 
   public boolean hasNext() {
-    return isInitialized && iterator != null && iterator.hasNext();
+    return isInitialized && iterator != null && (iterator.hasNext() || currentKVPair != null);
   }
 
   public Record next(boolean isGetPrevious) {
