@@ -1,8 +1,8 @@
-package CSCI485ClassProject;
+package CSCI485ClassProject.utils;
 
 import CSCI485ClassProject.models.ComparisonOperator;
 
-public class CursorUtils {
+public class ComparisonUtils {
   public static boolean compareTwoINT(Object obj1, Object obj2, ComparisonOperator cmp) {
     long val1;
     if (obj1 instanceof Integer) {

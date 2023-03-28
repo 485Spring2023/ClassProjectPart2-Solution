@@ -6,6 +6,7 @@ import CSCI485ClassProject.models.AttributeType;
 import CSCI485ClassProject.models.ComparisonOperator;
 import CSCI485ClassProject.models.Record;
 import CSCI485ClassProject.models.TableMetadata;
+import CSCI485ClassProject.utils.ComparisonUtils;
 import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.async.AsyncIterable;
@@ -42,8 +43,6 @@ public class Cursor {
   private AsyncIterator<KeyValue> iterator = null;
 
   private Record currentRecord = null;
-  // used by the col storage
-  private String currentAttributeName;
 
   private Transaction tx;
 
@@ -56,6 +55,10 @@ public class Cursor {
     this.mode = mode;
     this.tableName = tableName;
     this.tableMetadata = tableMetadata;
+    this.tx = tx;
+  }
+
+  public void setTx(Transaction tx) {
     this.tx = tx;
   }
 
@@ -213,11 +216,11 @@ public class Cursor {
     }
 
     if (recType == AttributeType.INT) {
-      return CursorUtils.compareTwoINT(recVal, predicateAttributeValue.getValue(), predicateOperator);
+      return ComparisonUtils.compareTwoINT(recVal, predicateAttributeValue.getValue(), predicateOperator);
     } else if (recType == AttributeType.DOUBLE){
-      return CursorUtils.compareTwoDOUBLE(recVal, predicateAttributeValue.getValue(), predicateOperator);
+      return ComparisonUtils.compareTwoDOUBLE(recVal, predicateAttributeValue.getValue(), predicateOperator);
     } else if (recType == AttributeType.VARCHAR) {
-      return CursorUtils.compareTwoVARCHAR(recVal, predicateAttributeValue.getValue(), predicateOperator);
+      return ComparisonUtils.compareTwoVARCHAR(recVal, predicateAttributeValue.getValue(), predicateOperator);
     }
 
     return false;
@@ -257,6 +260,10 @@ public class Cursor {
       }
     }
     return record;
+  }
+
+  public Record getCurrentRecord() {
+    return currentRecord;
   }
 
   public StatusCode updateCurrentRecord(String[] attrNames, Object[] attrValues) {

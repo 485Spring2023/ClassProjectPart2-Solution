@@ -100,6 +100,19 @@ public class Record {
     mapAttrNameToValue = new HashMap<>();
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    Record record = (Record) o;
+    return Objects.equals(mapAttrNameToValue, record.mapAttrNameToValue);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(mapAttrNameToValue);
+  }
+
   public HashMap<String, Value> getMapAttrNameToValue() {
     return mapAttrNameToValue;
   }

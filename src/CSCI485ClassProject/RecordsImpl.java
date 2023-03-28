@@ -35,36 +35,37 @@ public class RecordsImpl implements Records{
   }
   @Override
   public StatusCode insertRecord(String tableName, String[] primaryKeys, Object[] primaryKeysValues, String[] attrNames, Object[] attrValues) {
-
+    // open the transaction
     Transaction tx = FDBHelper.openTransaction(db);
+    // check if the table exists
     if (!FDBHelper.doesSubdirectoryExists(tx, Collections.singletonList(tableName))) {
       FDBHelper.abortTransaction(tx);
       return StatusCode.TABLE_NOT_FOUND;
     }
-
+    // check the validity of the input parameters
     if (primaryKeys == null || primaryKeysValues == null || attrNames == null || attrValues == null) {
       FDBHelper.abortTransaction(tx);
       return StatusCode.DATA_RECORD_CREATION_ATTRIBUTES_INVALID;
     }
-
     if (primaryKeys.length != primaryKeysValues.length || attrValues.length != attrNames.length) {
       FDBHelper.abortTransaction(tx);
       return StatusCode.DATA_RECORD_CREATION_ATTRIBUTES_INVALID;
     }
 
+    // get the tableMetadata
     TableMetadata tblMetadata = getTableMetadataByTableName(tx, tableName);
 
     List<String> pks = Arrays.asList(primaryKeys);
     List<String> schemaPks = tblMetadata.getPrimaryKeys();
 
-    // check if pks is identical to schemaPks
+    // check if the given primary keys are identical to primary keys stated in the table schema
     if (!pks.containsAll(schemaPks) || !schemaPks.containsAll(pks)) {
       FDBHelper.abortTransaction(tx);
       return StatusCode.DATA_RECORD_PRIMARY_KEYS_UNMATCHED;
     }
 
     Record record = new Record();
-    // add primary key value to record
+    // do the input values' type checking
     for (int i = 0; i<primaryKeys.length; i++) {
       StatusCode status = record.setAttrNameAndValue(primaryKeys[i], primaryKeysValues[i]);
       if (status != StatusCode.SUCCESS) {
@@ -108,6 +109,7 @@ public class RecordsImpl implements Records{
     }
 
     if (recordsTransformer.doesPrimaryKeyExist(tx, primKeyTuple)) {
+      FDBHelper.abortTransaction(tx);
       return StatusCode.DATA_RECORD_CREATION_RECORD_ALREADY_EXISTS;
     }
 
@@ -139,8 +141,7 @@ public class RecordsImpl implements Records{
     }
 
     TableMetadata tblMetadata = getTableMetadataByTableName(tx, tableName);
-    Cursor cursor = new Cursor(mode, tableName, tblMetadata, tx);
-    return cursor;
+    return new Cursor(mode, tableName, tblMetadata, tx);
   }
 
   @Override
@@ -199,12 +200,8 @@ public class RecordsImpl implements Records{
 
   @Override
   public StatusCode deleteRecord(Cursor cursor) {
+    // TODO: handle the case that the schema might changes
     return cursor.deleteCurrentRecord();
-  }
-
-  @Override
-  public StatusCode deleteDataRecord(String tableName, String[] attrNames, Object[] attrValues) {
-    return null;
   }
 
   @Override
@@ -221,5 +218,10 @@ public class RecordsImpl implements Records{
       cursor.abort();
     }
     return StatusCode.SUCCESS;
+  }
+
+  @Override
+  public StatusCode deleteDataRecord(String tableName, String[] attrNames, Object[] attrValues) {
+    return null;
   }
 }
