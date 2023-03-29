@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -201,7 +202,50 @@ public class RecordsImpl implements Records{
 
   @Override
   public StatusCode deleteRecord(Cursor cursor) {
-    // TODO: handle the case that the schema might changes
+    if (cursor == null || cursor.getTx() == null) {
+      return StatusCode.CURSOR_INVALID;
+    }
+    if (!cursor.isInitialized()) {
+      return StatusCode.CURSOR_NOT_INITIALIZED;
+    }
+    if (cursor.getCurrentRecord() == null) {
+      return StatusCode.CURSOR_REACH_TO_EOF;
+    }
+    Record recordToDelete = cursor.getCurrentRecord();
+    Set<String> attrDiffSet = new HashSet<>();
+    Transaction tx = cursor.getTx();
+
+    // Open another cursor and scan the table, see if the table schema needs to change because of the deletion
+    Cursor scanCursor =
+        new Cursor(Cursor.Mode.READ, cursor.getTableName(), cursor.getTableMetadata(), tx);
+    boolean isScanCursorInit = false;
+    while (true) {
+      Record record;
+      if (!isScanCursorInit) {
+        isScanCursorInit = true;
+        record = getFirst(scanCursor);
+      } else {
+        record = getNext(scanCursor);
+      }
+      if (record == null) {
+        break;
+      }
+      Set<String> attrSet = record.getMapAttrNameToValue().keySet();
+      Set<String> attrSetToDelete = new HashSet<>(recordToDelete.getMapAttrNameToValue().keySet());
+      attrSetToDelete.removeAll(attrSet);
+      attrDiffSet.addAll(attrSetToDelete);
+    }
+    if (!attrDiffSet.isEmpty()) {
+      // drop the attributes of the table
+      TableMetadataTransformer transformer = new TableMetadataTransformer(scanCursor.getTableName());
+      List<String> tblAttributeDirPath = transformer.getTableAttributeStorePath();
+      DirectorySubspace tableAttrDir = FDBHelper.openSubspace(tx, tblAttributeDirPath);
+
+      for (String attrNameToDrop : attrDiffSet) {
+        Tuple attrKeyTuple = TableMetadataTransformer.getTableAttributeKeyTuple(attrNameToDrop);
+        FDBHelper.removeKeyValuePair(tableAttrDir, tx, attrKeyTuple);
+      }
+    }
     return cursor.deleteCurrentRecord();
   }
 
