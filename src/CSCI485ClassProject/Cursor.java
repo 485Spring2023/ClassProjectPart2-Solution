@@ -15,6 +15,7 @@ import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -26,16 +27,20 @@ public class Cursor {
     READ_WRITE,
   }
 
+  // used by predicate
   private boolean isPredicateEnabled = false;
   private String predicateAttributeName;
   private Record.Value predicateAttributeValue;
   private ComparisonOperator predicateOperator;
 
+  // Table Schema Info
   private String tableName;
   private TableMetadata tableMetadata;
+
   private RecordsTransformer recordsTransformer;
 
   private boolean isInitialized = false;
+
   private boolean isInitializedToLast = false;
 
   private final Mode mode;
@@ -113,18 +118,16 @@ public class Cursor {
     this.tableMetadata = tableMetadata;
   }
 
-  public StatusCode enablePredicate(String attrName, Record.Value value, ComparisonOperator operator) {
+  public void enablePredicate(String attrName, Record.Value value, ComparisonOperator operator) {
     this.predicateAttributeName = attrName;
     this.predicateAttributeValue = value;
     this.predicateOperator = operator;
     this.isPredicateEnabled = true;
-    return null;
   }
 
 
 
-  private Record seek(Transaction tx, boolean isInitializing) {
-    // if it is not initialized, return null;
+  private Record moveToNextRecord(boolean isInitializing) {
     if (!isInitializing && !isInitialized) {
       return null;
     }
@@ -195,13 +198,10 @@ public class Cursor {
     }
     isInitializedToLast = false;
 
-    Record record = seek(tx, true);
+    Record record = moveToNextRecord(true);
     if (isPredicateEnabled) {
-      while (!doesRecordMatchPredicate(record)) {
-        record = seek(tx, false);
-        if (record == null) {
-          break;
-        }
+      while (record != null && !doesRecordMatchPredicate(record)) {
+        record = moveToNextRecord(false);
       }
     }
     return record;
@@ -232,10 +232,10 @@ public class Cursor {
     }
     isInitializedToLast = true;
 
-    Record record = seek(tx, true);
+    Record record = moveToNextRecord(true);
     if (isPredicateEnabled) {
       while (record != null && !doesRecordMatchPredicate(record)) {
-        record = seek(tx, false);
+        record = moveToNextRecord(false);
       }
     }
     return record;
@@ -253,10 +253,10 @@ public class Cursor {
       return null;
     }
 
-    Record record = seek(tx, false);
+    Record record = moveToNextRecord(false);
     if (isPredicateEnabled) {
       while (record != null && !doesRecordMatchPredicate(record)) {
-        record = seek(tx, false);
+        record = moveToNextRecord(false);
       }
     }
     return record;
@@ -280,6 +280,9 @@ public class Cursor {
     }
 
     Set<String> currentAttrNames = currentRecord.getMapAttrNameToValue().keySet();
+    Set<String> primaryKeys = new HashSet<>(tableMetadata.getPrimaryKeys());
+
+    boolean isUpdatingPK = false;
     for (int i = 0; i<attrNames.length; i++) {
       String attrNameToUpdate = attrNames[i];
       Object attrValToUpdate = attrValues[i];
@@ -291,12 +294,18 @@ public class Cursor {
       if (!Record.Value.isTypeSupported(attrValToUpdate)) {
         return StatusCode.ATTRIBUTE_TYPE_NOT_SUPPORTED;
       }
+
+      if (!isUpdatingPK && primaryKeys.contains(attrNameToUpdate)) {
+        isUpdatingPK = true;
+      }
     }
 
-    // delete the current record first
-    StatusCode deleteStatus = deleteCurrentRecord();
-    if (deleteStatus != StatusCode.SUCCESS) {
-      return deleteStatus;
+    if (isUpdatingPK) {
+      // delete the old record first
+      StatusCode deleteStatus = deleteCurrentRecord();
+      if (deleteStatus != StatusCode.SUCCESS) {
+        return deleteStatus;
+      }
     }
 
     for (int i = 0; i<attrNames.length; i++) {

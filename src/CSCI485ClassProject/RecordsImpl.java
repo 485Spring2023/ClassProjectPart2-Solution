@@ -166,6 +166,7 @@ public class RecordsImpl implements Records{
     Record.Value attrVal = new Record.Value();
     StatusCode initVal = attrVal.setValue(attrValue);
     if (initVal != StatusCode.SUCCESS) {
+      // check if the new value's type matches the table schema
       FDBHelper.abortTransaction(tx);
       return null;
     }
