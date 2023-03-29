@@ -251,17 +251,19 @@ public class RecordsImpl implements Records{
 
   @Override
   public StatusCode commitCursor(Cursor cursor) {
-    if (cursor != null) {
-      cursor.commit();
+    if (cursor == null) {
+      return StatusCode.CURSOR_INVALID;
     }
+    cursor.commit();
     return StatusCode.SUCCESS;
   }
 
   @Override
   public StatusCode abortCursor(Cursor cursor) {
-    if (cursor != null) {
-      cursor.abort();
+    if (cursor == null) {
+      return StatusCode.CURSOR_INVALID;
     }
+    cursor.abort();
     return StatusCode.SUCCESS;
   }
 
